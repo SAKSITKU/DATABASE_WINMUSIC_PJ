@@ -9,7 +9,7 @@ services:
       - api
 
   api:
-    build: ./Backend
+    build: ./src/Backend
     ports:
       - "3000:3000"
     environment:
