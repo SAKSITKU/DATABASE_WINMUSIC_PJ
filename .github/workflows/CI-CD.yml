@@ -42,7 +42,8 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           # สคริปต์ที่จะไปรันบนเซิร์ฟเวอร์ของคุณเพื่อดึง Image ใหม่มาเปิด
           script: |
-            docker pull saksitku/winmusic:latest
-            docker stop my-react-app || true
-            docker rm my-react-app || true
-            docker run -d --name my-react-app -p 80:80 saksitku/winmusic:latest
+            cd /home/ubuntu/DATABASE_WINMUSIC_PJ
+
+            docker-compose down
+            docker-compose pull
+            docker-compose up -d --build
