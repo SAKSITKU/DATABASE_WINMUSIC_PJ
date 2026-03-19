@@ -25,5 +25,6 @@ services:
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=123456   # ต้อง strong!
+      - MSSQL_MEMORY_LIMIT_MB=512   
     ports:
       - "1433:1433"
