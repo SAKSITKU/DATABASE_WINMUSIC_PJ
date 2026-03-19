@@ -1,7 +1,7 @@
 // Cart.jsx
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext.jsx';
-const API = import.meta.env.VITE_API_BASE || "http://localhost:3040";
+const API = import.meta.env.VITE_API_BASE ;
 
 const getImageUrl = (u) => {
   if (!u) return "https://placehold.co/120x80?text=No+Image";

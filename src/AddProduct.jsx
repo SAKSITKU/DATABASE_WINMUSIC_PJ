@@ -1,7 +1,7 @@
 // AddProduct.jsx
 import { useEffect, useState } from "react";
 import { useAuth } from "./AuthContext.jsx";
-const API = import.meta.env.VITE_API_BASE || "http://localhost:3040";
+const API = import.meta.env.VITE_API_BASE;
 const safeJson = async (res) => {
   const text = await res.text();
   try { return JSON.parse(text); } catch { return { _raw: text }; }
