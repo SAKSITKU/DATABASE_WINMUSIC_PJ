@@ -579,4 +579,5 @@ app.get("/api/products/:id", async (req, res) => {
 
 
 const PORT = process.env.PORT || 3040;
-app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
+app.listen(3000, '0.0.0.0')
+//app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
