@@ -3,7 +3,7 @@ import sql from 'mssql';
 import 'dotenv/config';
 
 const config = {
-  server: process.env.DB_SERVER,          // ชื่อเครื่อง/IP
+  server: process.env.DB_HOST,          // ชื่อเครื่อง/IP
   port:   Number(process.env.DB_PORT || 1433),
   user:   process.env.DB_USER,
   password: process.env.DB_PASS,
