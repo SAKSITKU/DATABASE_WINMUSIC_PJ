@@ -6,7 +6,7 @@ services:
     container_name: db
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=123456
+      - SA_PASSWORD=@Fomost240148
       - MSSQL_MEMORY_LIMIT_MB=512
     ports:
       - "1433:1433"
@@ -19,7 +19,7 @@ services:
     environment:
       - DB_HOST=db
       - DB_USER=sa
-      - DB_PASS=123456
+      - DB_PASS=@Fomost240148
       - DB_NAME=Stockdata
     depends_on:
       - db
