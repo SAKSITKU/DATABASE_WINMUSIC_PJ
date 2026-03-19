@@ -6,25 +6,29 @@ services:
     container_name: db
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=@Fomost240148
-      - MSSQL_MEMORY_LIMIT_MB=512
+      - SA_PASSWORD=Winmusic@123   # ⚠️ ต้อง strong เท่านั้น
     ports:
       - "1433:1433"
+    restart: always
 
   api:
-    build: .
+    build: ./backend
     container_name: api
     ports:
       - "3000:3000"
     environment:
       - DB_HOST=db
+      - DB_PORT=1433
       - DB_USER=sa
-      - DB_PASS=@Fomost240148
-      - DB_NAME=Stockdata
+      - DB_PASS=Winmusic@123
+      - DB_NAME=master
     depends_on:
       - db
+    restart: always
 
   web:
     image: saksitku/winmusic:latest
+    container_name: web
     ports:
       - "80:80"
+    restart: always
