@@ -15,7 +15,7 @@ services:
     environment:
       DB_HOST: db
       DB_USER: sa
-      DB_PASS: 123456
+      DB_PASS: "123456"
       DB_NAME: Stockdata
     depends_on:
       - db
@@ -24,7 +24,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       ACCEPT_EULA: "Y"
-      SA_PASSWORD: "@Fomost240148"
+      SA_PASSWORD: "123456"
       MSSQL_PID: "Express"
     ports:
       - "1433:1433"
