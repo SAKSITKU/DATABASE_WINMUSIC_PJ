@@ -1,57 +1,63 @@
-// categoriesModel.js
-import { getPool, sql } from './db.js';
+import { getPool } from './db.js';
 
-// ✅ ดึงข้อมูลทั้งหมด
+// 📦 ดึงทั้งหมด
 export async function listCategories() {
   const pool = await getPool();
-  const result = await pool.request().query(`
+
+  const [rows] = await pool.execute(`
     SELECT CategoryID, CategoryName
-    FROM dbo.Categories
+    FROM Categories
     ORDER BY CategoryID DESC
   `);
-  return result.recordset;
+
+  return rows;
 }
 
-// ✅ สร้าง Category ใหม่
+// ➕ สร้าง
 export async function createCategory({ CategoryName }) {
   const pool = await getPool();
-  const req = pool.request()
-    .input('CategoryName', sql.NVarChar(255), CategoryName);
 
-  const rs = await req.query(`
+  const [result] = await pool.execute(
+    `
     INSERT INTO Categories (CategoryName)
-    OUTPUT INSERTED.CategoryID AS id
-    VALUES (@CategoryName);
-  `);
-  return rs.recordset[0]; // { id: ... }
+    VALUES (?)
+    `,
+    [CategoryName]
+  );
+
+  return {
+    id: result.insertId
+  };
 }
 
-// ✅ อ่าน Category ตาม ID
+// 🔍 หา by id
 export async function getCategoryById(id) {
   const pool = await getPool();
-  const r = await pool.request()
-    .input('id', sql.Int, id)
-    .query(`
-      SELECT
-        CategoryID   AS id,
-        CategoryName
-      FROM dbo.Categories
-      WHERE CategoryID = @id
-    `);
-  return r.recordset[0] || null;
+
+  const [rows] = await pool.execute(
+    `
+    SELECT CategoryID AS id, CategoryName
+    FROM Categories
+    WHERE CategoryID = ?
+    `,
+    [id]
+  );
+
+  return rows[0] || null;
 }
 
-// ✅ อัปเดต Category
+// ✏ update
 export async function updateCategory(id, { CategoryName }) {
   const pool = await getPool();
-  const req = pool.request()
-    .input('id', sql.Int, id)
-    .input('CategoryName', sql.NVarChar(255), CategoryName);
 
-  await req.query(`
+  await pool.execute(
+    `
     UPDATE Categories
-    SET CategoryName = @CategoryName
-    WHERE CategoryID = @id;
-  `);
+    SET CategoryName = ?
+    WHERE CategoryID = ?
+    `,
+    [CategoryName, id]
+  );
+
   return { id };
 }

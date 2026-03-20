@@ -8,6 +8,7 @@ import fs from 'fs';
 import multer from 'multer';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { getPool} from "./db.js"; 
 import { findUserByUsername, createUser } from './authModel.js';
 import { requireAuth, requireRole } from './authMiddleware.js';
 import { fileURLToPath } from 'url';
@@ -357,32 +358,34 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
 // ดูรายการในออเดอร์ (ปลอดภัยน้อยกว่าเพราะไม่มี User ผูก)
 // อาจใส่ requireRole('Admin') ถ้าต้องการ
 // ✅ ดึงประวัติของ "ฉัน" โดยไม่ใช้ SESSION_CONTEXT และไม่แตะสคีมา
-import { getPool, sql } from "./db.js"; // เอาไว้บนสุดกับ imports อื่น
+// เอาไว้บนสุดกับ imports อื่น
 
-app.get("/api/orders/history", requireAuth, async (req, res) => {
+  app.get("/api/orders/history", requireAuth, async (req, res) => {
   try {
     const pool = await getPool();
-    const result = await pool.request()
-      .input("UserID", sql.Int, req.user.id)
-      .query(`
-        SELECT 
-          UserID,
-          UserName,
-          SupplierContactName,
-          ProductName,
-          UnitPrice,
-          Quantity,
-          TotalPrice,
-          PurchaseDate,
-          ImageURL
-        FROM dbo.vw_UserPurchaseHistory
-        WHERE UserID = @UserID
-        ORDER BY PurchaseDate DESC;
-      `);
-    res.json(result.recordset);
+    const [rows] = await pool.execute(
+      `
+      SELECT 
+        UserID,
+        UserName,
+        SupplierContactName,
+        ProductName,
+        UnitPrice,
+        Quantity,
+        TotalPrice,
+        PurchaseDate,
+        ImageURL
+      FROM vw_UserPurchaseHistory
+      WHERE UserID = ?
+      ORDER BY PurchaseDate DESC
+      `,
+      [req.user.id]
+    );
+
+    res.json(rows);
   } catch (err) {
-    console.error("❌ Error fetching purchase history:", err);
-    res.status(500).json({ error: "Failed to load purchase history", detail: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Failed to load purchase history" });
   }
 });
 
@@ -472,32 +475,6 @@ app.get("/api/products/top5", async (req, res) => {
 
 
 // ✅ ดึงเฉพาะของผู้ใช้ที่ล็อกอินอยู่
-app.get("/api/orders/history", requireAuth, async (req, res) => {
-  try {
-    const pool = await getPool();
-    const result = await pool.request()
-      .input("UserID", sql.Int, req.user.id)
-      .query(`
-        SELECT 
-          UserID,
-          UserName,
-          SupplierContactName,
-          ProductName,
-          UnitPrice,
-          Quantity,
-          TotalPrice,
-          PurchaseDate,
-          ImageURL
-        FROM dbo.vw_UserPurchaseHistory
-        WHERE UserID = @UserID
-        ORDER BY PurchaseDate DESC;
-      `);
-    res.json(result.recordset);
-  } catch (err) {
-    console.error("❌ Error fetching purchase history:", err);
-    res.status(500).json({ error: "Failed to load purchase history", detail: err.message });
-  }
-});
 // -------------------------------------------------------
 // ✅ GET /api/products/sorted — ดึงสินค้าจาก VIEW (vw_SortProducts)
 // -------------------------------------------------------
@@ -512,14 +489,12 @@ app.get("/api/products/sorted", async (req, res) => {
 
     const q = `
       SELECT ProductID, ProductName, UnitPrice, UnitsInStock, ImageURL, SupplierName
-      FROM dbo.vw_SortProducts
+      FROM vw_SortProducts
       ORDER BY ${orderBy};
     `;
+    const [rows] = await pool.execute(q);
 
-    const result = await pool.request().query(q);
-
-    // ✅ แปลงชื่อ field ให้ตรงกับ React (นี่คือส่วนสำคัญมาก!)
-    const mapped = result.recordset.map(row => ({
+    const mapped = rows.map(row => ({
   id: row.ProductID,
   name: row.ProductName,
   price: row.UnitPrice,
@@ -527,6 +502,7 @@ app.get("/api/products/sorted", async (req, res) => {
   image_url: row.ImageURL,
   supplier: row.SupplierName
 }));
+
 res.json(mapped);
 
   } catch (err) {
@@ -540,40 +516,41 @@ app.get("/api/products/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const pool = await getPool();
+const [rows] = await pool.execute(
+  `
+  SELECT 
+    p.ProductID,
+    p.ProductName,
+    p.UnitPrice,
+    p.UnitsInStock,
+    p.Description,
+    p.ImageURL,
+    p.date_added,
+    p.last_updated,
+    c.CategoryID,
+    c.CategoryName,
+    s.SupplierID,
+    s.CompanyName,
+    s.ContactName
+  FROM Products p
+  LEFT JOIN Categories c ON p.CategoryID = c.CategoryID
+  LEFT JOIN Suppliers s ON p.SupplierID = s.SupplierID
+  WHERE p.ProductID = ?
+  `,
+  [id]
+);
 
-    const result = await pool.request()
-      .input("id", sql.Int, id)
-      .query(`
-        SELECT 
-          p.ProductID,
-          p.ProductName,
-          p.UnitPrice,
-          p.UnitsInStock,
-          p.Description,
-          p.ImageURL,
-          p.date_added,
-          p.last_updated,
-          c.CategoryID,
-          c.CategoryName,
-          s.SupplierID,
-          s.CompanyName,
-          s.ContactName
-        FROM dbo.Products p
-        LEFT JOIN dbo.Categories c ON p.CategoryID = c.CategoryID
-        LEFT JOIN dbo.Suppliers s ON p.SupplierID = s.SupplierID
-        WHERE p.ProductID = @id
-      `);
+if (rows.length === 0) {
+  return res.status(404).json({ error: "Product not found" });
+}
 
-    if (result.recordset.length === 0) {
-      return res.status(404).json({ error: "Product not found" });
-    }
-
-    res.json(result.recordset[0]);
+res.json(rows[0]);
   } catch (err) {
     console.error("❌ GET /api/products/:id failed:", err.message);
     res.status(500).json({ error: "load detail failed", detail: err.message });
   }
 });
+
 
 
 

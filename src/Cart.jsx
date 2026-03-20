@@ -56,14 +56,17 @@ export default function Cart({ items, onChangeQty, onRemove, onBack, onCheckoutD
     }, 0);
   }, [items, pricing]);
 
-  const total = useMemo(() => {
-    return (items || []).reduce((s, it) => {
-      const line = pricing.byId[it.id]?.line_total ?? ((Number(it.price) || 0) * (it.qty || 1));
-      return s + line;
-    }, 0);
-  }, [items, pricing]);
+ const total = useMemo(() => {
+  return (items || []).reduce((s, it) => {
+    const unit = Number(it.price) || 0;
+    const rate = it.qty >= 2 ? 0.15 : 0;
+    const qty = it.qty || 1;
 
-  const discountTotal = useMemo(() => Math.max(0, subtotal - total), [subtotal, total]);
+    return s + (unit * (1 - rate) * qty);
+  }, 0);
+}, [items]);
+
+ const discountTotal = subtotal - total;
 
   // เปลี่ยนจำนวน
   const step = (id, delta) => {
@@ -72,6 +75,7 @@ export default function Cart({ items, onChangeQty, onRemove, onBack, onCheckoutD
     const nextQty = Math.max(1, (it.qty || 1) + delta);
     onChangeQty(id, nextQty); // ไม่ต้องส่ง discount แล้ว
   };
+  
 
   // ชำระเงิน: ส่งเฉพาะ product_id, quantity (ให้ฝั่งเซิร์ฟเวอร์คิดส่วนลด/ราคาเอง)
   const checkout = async () => {
@@ -130,30 +134,40 @@ export default function Cart({ items, onChangeQty, onRemove, onBack, onCheckoutD
             ) : items.map(it => {
               const q = pricing.byId[it.id];
               const unit = q?.unit_price ?? (Number(it.price) || 0);
-              const rate = q?.rate ?? 0;
+              const rate = it.qty >= 2 ? 0.15 : 0;
               const netU = q?.net_unit_price ?? unit;
               const line = q?.line_total ?? (unit * (it.qty || 1));
               return (
                 <div className="cart-item" key={it.id} style={{ gridTemplateColumns: 'minmax(280px,1.2fr) 220px 200px' }}>
                   <div className="cart-left">
-                    <img className="thumb" src={getImageUrl(it.img || it.image_url)} alt={it.name} />
-                    <div className="meta">
-                      <div className="name">{it.name}</div>
-                      <div className="unit">
-                        ฿{Number(unit).toLocaleString()}
-                        {rate > 0 && (
-                          <span style={{ marginLeft: 8, fontSize: 12, color: '#16a34a' }}>
-                            −{(rate * 100).toFixed(0)}%
-                          </span>
-                        )}
-                      </div>
-                      {rate > 0 && (
-                        <div className="unit">สุทธิ/หน่วย: ฿{Number(netU).toLocaleString()}</div>
-                      )}
-                    </div>
-                  </div>
+  <img className="thumb" src={getImageUrl(it.img || it.image_url)} alt={it.name} />
 
-                  <div className="qty-col">
+  <div className="meta">
+    <div className="name">{it.name}</div>
+
+    <div className="unit">
+      ฿{Number(unit).toLocaleString()}
+      {rate > 0 && (
+        <span style={{ marginLeft: 8, fontSize: 12, color: '#16a34a' }}>
+          −{(rate * 100).toFixed(0)}%
+        </span>
+      )}
+    </div>
+
+    {rate > 0 && (
+      <>
+        <div className="unit">
+          ลดต่อหน่วย: ฿{Number(unit - netU).toLocaleString()}
+        </div>
+        <div className="unit">
+          สุทธิ/หน่วย: ฿{Number(netU).toLocaleString()}
+        </div>
+      </>
+    )}
+  </div>
+</div> {/* ✅ ปิด cart-left ต้องมี */}
+
+<div className="qty-col">
                     <div className="label">Qty</div>
                     <div className="qty-stepper">
                       <button onClick={() => step(it.id, -1)} aria-label="decrease">−</button>
