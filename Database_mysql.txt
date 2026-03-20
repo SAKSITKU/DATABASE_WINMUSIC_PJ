@@ -1,0 +1,246 @@
+-- 1. CREATE DATABASE + TABLES
+CREATE DATABASE IF NOT EXISTS stockdb;
+USE stockdb;
+
+-- Users
+CREATE TABLE Users (
+    UserID INT AUTO_INCREMENT PRIMARY KEY,
+    Username VARCHAR(100),
+    Password VARCHAR(255),
+    Role VARCHAR(50),
+    DateCreated DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Suppliers
+CREATE TABLE Suppliers (
+    SupplierID INT AUTO_INCREMENT PRIMARY KEY,
+    CompanyName VARCHAR(255),
+    ContactName VARCHAR(255),
+    Address TEXT,
+    PostalCode VARCHAR(20),
+    Country VARCHAR(100)
+);
+
+-- Categories
+CREATE TABLE Categories (
+    CategoryID INT AUTO_INCREMENT PRIMARY KEY,
+    CategoryName VARCHAR(255)
+);
+
+-- Products
+CREATE TABLE Products (
+    ProductID INT AUTO_INCREMENT PRIMARY KEY,
+    ProductName VARCHAR(255),
+    SupplierID INT,
+    CategoryID INT,
+    Description TEXT,
+    UnitPrice DECIMAL(10,2),
+    UnitsInStock INT,
+    date_added DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    ImageURL TEXT,
+
+    FOREIGN KEY (SupplierID) REFERENCES Suppliers(SupplierID),
+    FOREIGN KEY (CategoryID) REFERENCES Categories(CategoryID)
+);
+
+-- OrderDetails
+CREATE TABLE OrderDetails (
+    OrderID INT,
+    ProductID INT,
+    UnitPrice DECIMAL(10,2),
+    Quantity INT,
+    Discount DECIMAL(5,2),
+
+    PRIMARY KEY (OrderID, ProductID),
+    FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+);
+
+-- StockTransactions
+CREATE TABLE Stock_Transactions (
+    TransactionID INT AUTO_INCREMENT PRIMARY KEY,
+    ProductID INT,
+    UserID INT,
+    QuantityChange INT,
+    TransactionDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (ProductID) REFERENCES Products(ProductID),
+    FOREIGN KEY (UserID) REFERENCES Users(UserID)
+);
+
+-- 2 VIEW
+-- 2.1 Purchase History
+
+CREATE VIEW vw_UserPurchaseHistory AS
+SELECT 
+    s.UserID,
+    u.Username AS UserName,
+    sup.ContactName AS SupplierContactName,
+    p.ProductName,
+    p.UnitPrice,
+    (s.QuantityChange * -1) AS Quantity,
+    p.UnitPrice * (s.QuantityChange * -1) AS TotalPrice,
+    s.TransactionDate AS PurchaseDate,
+    p.ImageURL
+FROM Stock_Transactions s
+JOIN Users u ON s.UserID = u.UserID
+JOIN Products p ON s.ProductID = p.ProductID
+JOIN Suppliers sup ON p.SupplierID = sup.SupplierID
+WHERE s.QuantityChange < 0;
+
+-- 2.2 Sort Products
+
+CREATE VIEW vw_SortProducts AS
+SELECT
+    p.ProductID,
+    p.ProductName,
+    p.UnitPrice,
+    p.UnitsInStock,
+    p.ImageURL,
+    s.CompanyName AS SupplierName
+FROM Products p
+JOIN Suppliers s ON p.SupplierID = s.SupplierID;
+
+-- 3.1 Discount Rate
+
+DELIMITER $$
+
+CREATE FUNCTION fn_GetDiscountRate(Quantity INT)
+RETURNS DECIMAL(5,2)
+DETERMINISTIC
+BEGIN
+    RETURN CASE 
+        WHEN Quantity >= 2 THEN 0.15
+        ELSE 0.00
+    END;
+END$$
+
+DELIMITER ;
+
+-- 3.2 Calculate Line Amounts
+
+DELIMITER $$
+
+CREATE FUNCTION fn_CalcLineNet(UnitPrice DECIMAL(10,2), Quantity INT)
+RETURNS DECIMAL(10,2)
+DETERMINISTIC
+BEGIN
+    DECLARE discount DECIMAL(5,2);
+    SET discount = fn_GetDiscountRate(Quantity);
+
+    RETURN (UnitPrice * Quantity) * (1 - discount);
+END$$
+
+DELIMITER ;
+
+-- 4. TRIGGER
+-- 4.1 Block Oversell
+
+DELIMITER $$
+
+CREATE TRIGGER TRG_Products_BlockOversell
+BEFORE UPDATE ON Products
+FOR EACH ROW
+BEGIN
+    IF NEW.UnitsInStock IS NULL OR NEW.UnitsInStock < 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'UnitsInStock cannot be NULL or negative';
+    END IF;
+END$$
+
+DELIMITER ;
+
+-- 4.2 Stock Update + Insert Transaction
+
+DELIMITER $$
+
+CREATE TRIGGER TRG_ProductsStocks_Update
+AFTER UPDATE ON Products
+FOR EACH ROW
+BEGIN
+    DECLARE v_user_id INT;
+
+    -- ใช้ session variable แทน
+    SET v_user_id = @user_id;
+
+    IF v_user_id IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Missing user_id in session';
+    END IF;
+
+    IF OLD.UnitsInStock IS NOT NULL 
+       AND NEW.UnitsInStock IS NOT NULL 
+       AND OLD.UnitsInStock <> NEW.UnitsInStock THEN
+
+        INSERT INTO Stock_Transactions
+        (ProductID, UserID, QuantityChange, TransactionDate)
+        VALUES
+        (NEW.ProductID, v_user_id, NEW.UnitsInStock - OLD.UnitsInStock, NOW());
+
+    END IF;
+END$$
+
+DELIMITER ;
+
+-- 5. STORED PROCEDURE
+-- 5.1 Preview Order
+
+DELIMITER $$
+
+CREATE PROCEDURE usp_PreviewAfterDiscountByOrderID(IN p_OrderID INT)
+BEGIN
+    DECLARE hasOrder INT;
+
+    SELECT COUNT(*) INTO hasOrder
+    FROM OrderDetails
+    WHERE OrderID = p_OrderID;
+
+    IF hasOrder = 0 THEN
+        SELECT 'OrderID not found in OrderDetails' AS Message;
+    ELSE
+	
+        SELECT
+            od.OrderID,
+            p.ProductID,
+            p.ProductName,
+            p.UnitPrice,
+            od.Quantity,
+            fn_GetDiscountRate(od.Quantity) AS DiscountRate,
+            (p.UnitPrice * od.Quantity) * fn_GetDiscountRate(od.Quantity) AS DiscountAmount,
+            (p.UnitPrice * od.Quantity) * (1 - fn_GetDiscountRate(od.Quantity)) AS NetAmount
+        FROM OrderDetails od
+        JOIN Products p ON od.ProductID = p.ProductID
+        WHERE od.OrderID = p_OrderID;
+
+        -- summary
+        SELECT
+            p_OrderID AS OrderID,
+            SUM(p.UnitPrice * od.Quantity) AS Subtotal,
+            SUM((p.UnitPrice * od.Quantity) * fn_GetDiscountRate(od.Quantity)) AS TotalDiscount,
+            SUM((p.UnitPrice * od.Quantity) * (1 - fn_GetDiscountRate(od.Quantity))) AS GrandTotal
+        FROM OrderDetails od
+        JOIN Products p ON od.ProductID = p.ProductID
+        WHERE od.OrderID = p_OrderID;
+    END IF;
+END$$
+
+DELIMITER ;
+
+-- 5.2 Top 5 Products
+
+DELIMITER $$
+
+CREATE PROCEDURE Pro_Top5_Products()
+BEGIN
+    SELECT 
+        p.ProductID,
+        p.ProductName,
+        c.CategoryName,
+        p.UnitsInStock
+    FROM Products p
+    LEFT JOIN Categories c ON p.CategoryID = c.CategoryID
+    ORDER BY p.UnitsInStock DESC, p.ProductName ASC
+    LIMIT 5;
+END$$
+
+DELIMITER ;
