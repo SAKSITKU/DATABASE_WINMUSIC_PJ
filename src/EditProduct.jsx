@@ -1,7 +1,7 @@
 // EditProduct.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "./AuthContext.jsx";
-const API = import.meta.env.VITE_API_BASE || "http://localhost:3040";
+const API = import.meta.env.VITE_API_BASE ;
 
 const getImageUrl = (u) => (!u ? "https://placehold.co/600x400?text=No+Image" : (u.startsWith("http") ? u : `${API}${u}`));
 

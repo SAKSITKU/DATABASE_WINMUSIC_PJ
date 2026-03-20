@@ -14,7 +14,7 @@ import OrderSummary from "./OrderSummary.jsx";
 
 
 
-const API = import.meta.env.VITE_API_BASE || "http://localhost:3040";
+const API = import.meta.env.VITE_API_BASE ;
 // ⬆️ วางไว้บนสุดของ App.jsx หลังประกาศ API
 const getImageUrl = (u) => {
   if (!u) return "https://placehold.co/600x400?text=No+Image";

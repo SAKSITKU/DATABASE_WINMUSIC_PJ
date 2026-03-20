@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const API = import.meta.env.VITE_API_BASE || "http://localhost:3040";
+const API = import.meta.env.VITE_API_BASE ;
 
 export default function PurchaseHistory({ onBack }) {
   const [records, setRecords] = useState([]);

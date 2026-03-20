@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "./AuthContext.jsx";
 
-const API = import.meta.env.VITE_API_BASE || "http://localhost:3040";
+const API = import.meta.env.VITE_API_BASE ;
 
 const fmtTHB = (n) =>
   (n ?? 0).toLocaleString("th-TH", { style: "currency", currency: "THB" });
