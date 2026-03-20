@@ -1,35 +1,18 @@
-// db.js
-import sql from 'mssql';
+import mysql from 'mysql2/promise';
 import 'dotenv/config';
 
-const config = {
-  server: process.env.DB_SERVER,          // ชื่อเครื่อง/IP
-  port:   Number(process.env.DB_PORT || 1433),
-  user:   process.env.DB_USER,
+const pool = mysql.createPool({
+  host: process.env.DB_SERVER,
+  port: process.env.DB_PORT || 3306,
+  user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
-  options: {
-    encrypt: process.env.DB_ENCRYPT === 'true',
-    trustServerCertificate: process.env.DB_TRUST_SERVER_CERT === 'true'
-  },
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
-};
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
 
-let poolPromise;
+// ใช้ pool ตรง ๆ ได้เลย
 export const getPool = async () => {
-  if (!poolPromise) {
-    poolPromise = sql.connect(config)
-      .then(pool => {
-        console.log('✅ MSSQL connected');
-        return pool;
-      })
-      .catch(err => {
-        console.error('❌ MSSQL connection error:', err);
-        poolPromise = null;
-        throw err;
-      });
-  }
-  return poolPromise;
+  return pool;
 };
-
-export { sql };
