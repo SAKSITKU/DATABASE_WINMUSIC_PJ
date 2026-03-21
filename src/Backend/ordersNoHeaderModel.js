@@ -1,5 +1,11 @@
 import { getPool } from './db.js';
 
+// ✅ คำนวณ Discount Rate ใน JavaScript แทน MySQL Function
+function getDiscountRate(qty) {
+  if (qty >= 2) return 0.15;
+  return 0.00;
+}
+
 // ✅ CHECKOUT (MySQL version)
 export async function checkoutNoHeader({ items = [], currentUserId = 0 }) {
 
@@ -22,9 +28,7 @@ export async function checkoutNoHeader({ items = [], currentUserId = 0 }) {
     // 🔥 สำคัญ: ให้ trigger ใช้ user นี้
     await conn.query(`SET @user_id = ?`, [currentUserId]);
 
-    // MySQL ไม่มี sequence → ใช้ timestamp
-    // ✅ สร้าง OrderID เอง แต่ต้องไม่ overflow
-const orderId = Math.floor(Date.now() / 1000);
+    const orderId = Math.floor(Date.now() / 1000);
 
     for (const { product_id: pid, quantity: qty } of items) {
 
@@ -39,14 +43,15 @@ const orderId = Math.floor(Date.now() / 1000);
       }
 
       const unitPrice = rows[0].UnitPrice;
+      const unitsInStock = rows[0].UnitsInStock;
 
-      // 2. คำนวณ discount
-      const [disc] = await conn.query(
-        `SELECT fn_GetDiscountRate(?) AS rate`,
-        [qty]
-      );
+      // ✅ เช็คสต็อกใน JS
+      if (qty > unitsInStock) {
+        throw new Error(`UnitsInStock ไม่เพียงพอสำหรับสินค้า ID: ${pid}`);
+      }
 
-      const discountRate = disc[0].rate;
+      // 2. ✅ คำนวณ discount ใน JS แทน MySQL Function
+      const discountRate = getDiscountRate(qty);
 
       // 3. insert order detail
       await conn.query(`
@@ -54,7 +59,7 @@ const orderId = Math.floor(Date.now() / 1000);
         VALUES (?, ?, ?, ?, ?)
       `, [orderId, pid, unitPrice, qty, discountRate]);
 
-      // 4. update stock → trigger จะทำงาน
+      // 4. update stock
       await conn.query(`
         UPDATE Products
         SET UnitsInStock = UnitsInStock - ?
@@ -106,43 +111,47 @@ export async function getOrderItems(orderId) {
   return rows;
 }
 
-// ✅ PREVIEW (แทน Stored Procedure)
+// ✅ PREVIEW (คำนวณ discount ใน JS แทน MySQL Function)
 export async function previewAfterDiscountByOrderId(orderId) {
   const pool = await getPool();
 
-    const [items] = await pool.query(`
+  const [rows] = await pool.query(`
     SELECT
       od.ProductID AS id,
       p.ProductName AS name,
       p.UnitPrice AS unit_price,
       od.Quantity AS qty,
-      fn_GetDiscountRate(od.Quantity) AS rate,
-      (p.UnitPrice * od.Quantity) * fn_GetDiscountRate(od.Quantity) AS discount_amount,
-      (p.UnitPrice * od.Quantity) * (1 - fn_GetDiscountRate(od.Quantity)) AS line_total
+      od.Discount AS rate
     FROM OrderDetails od
     JOIN Products p ON od.ProductID = p.ProductID
     WHERE od.OrderID = ?
     ORDER BY od.ProductID
   `, [orderId]);
 
-  // ✅ summary ถูกอยู่แล้ว
-  const [sum] = await pool.query(`
-    SELECT
-      SUM(p.UnitPrice * od.Quantity) AS Subtotal,
-      SUM((p.UnitPrice * od.Quantity) * fn_GetDiscountRate(od.Quantity)) AS TotalDiscount,
-      SUM((p.UnitPrice * od.Quantity) * (1 - fn_GetDiscountRate(od.Quantity))) AS GrandTotal
-    FROM OrderDetails od
-    JOIN Products p ON od.ProductID = p.ProductID
-    WHERE od.OrderID = ?
-  `, [orderId]);
+  // ✅ คำนวณใน JS แทน
+  const items = rows.map(row => {
+    const rate = getDiscountRate(row.qty);
+    const discount_amount = row.unit_price * row.qty * rate;
+    const line_total = row.unit_price * row.qty * (1 - rate);
+    return {
+      ...row,
+      rate,
+      discount_amount,
+      line_total,
+    };
+  });
+
+  const subtotal = items.reduce((s, i) => s + i.unit_price * i.qty, 0);
+  const discount_total = items.reduce((s, i) => s + i.discount_amount, 0);
+  const grand_total = items.reduce((s, i) => s + i.line_total, 0);
 
   return {
     items,
     summary: {
       order_id: orderId,
-      subtotal: Number(sum[0]?.Subtotal || 0),
-      discount_total: Number(sum[0]?.TotalDiscount || 0),
-      grand_total: Number(sum[0]?.GrandTotal || 0),
+      subtotal: Number(subtotal.toFixed(2)),
+      discount_total: Number(discount_total.toFixed(2)),
+      grand_total: Number(grand_total.toFixed(2)),
     }
   };
 }
