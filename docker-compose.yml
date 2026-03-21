@@ -2,16 +2,18 @@ version: '3.8'
 
 services:
   app:
-    image: saksitku/winmusic:latest
+    image: YOUR_DOCKER_USERNAME/YOUR_REPO_NAME:latest
     container_name: winmusic-app
     restart: always
     ports:
       - "80:80"
+      - "3040:3040"
     environment:
-      - DB_SERVER=winmusic-db.xxxxxxxxxx.ap-southeast-2.rds.amazonaws.com
+      - DB_SERVER=winmusic-mysql.cpcw0oo2mac7.ap-southeast-2.rds.amazonaws.com
       - DB_PORT=3306
       - DB_USER=admin
       - DB_PASS=WinMusic1234!
       - DB_NAME=stockdb
       - JWT_SECRET=my_super_secret_key_123456
       - JWT_EXPIRES=7d
+      - VITE_API_BASE=http://13.239.219.107:3040
