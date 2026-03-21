@@ -1,5 +1,25 @@
-FROM node:18
+# Stage 1: Build React
+FROM node:18-alpine AS build
 WORKDIR /app
-COPY . .
+COPY package.json package-lock.json ./
 RUN npm install
-CMD ["node", "server.js"]
+COPY . .
+RUN npm run build
+
+# Stage 2: Backend + Frontend
+FROM node:18-alpine
+WORKDIR /app
+
+COPY src/Backend/package*.json ./
+RUN npm install --production
+COPY src/Backend/*.js ./
+RUN mkdir -p uploads/images
+
+COPY --from=build /app/dist ./public
+RUN npm install -g serve
+
+EXPOSE 80 3040
+
+COPY src/Backend/start.sh ./
+RUN chmod +x start.sh
+CMD ["./start.sh"]

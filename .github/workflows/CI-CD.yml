@@ -26,9 +26,9 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: ./src/Backend/Dockerfile
           push: true
-          # เปลี่ยน 'your-username/your-repo-name' เป็นชื่อของคุณ
-          tags: saksitku/winmusic:latest 
+          tags: saksitku/winmusic:latest
 
   deploy:
     needs: build-and-push-docker-image
