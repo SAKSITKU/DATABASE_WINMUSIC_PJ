@@ -1,34 +1,17 @@
 version: '3.8'
 
 services:
-  db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: db
-    environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=Winmusic@123   # ⚠️ ต้อง strong เท่านั้น
-    ports:
-      - "1433:1433"
-    restart: always
-
-  api:
-    build: ./backend
-    container_name: api
-    ports:
-      - "3000:3000"
-    environment:
-      - DB_HOST=db
-      - DB_PORT=1433
-      - DB_USER=sa
-      - DB_PASS=Winmusic@123
-      - DB_NAME=master
-    depends_on:
-      - db
-    restart: always
-
-  web:
+  app:
     image: saksitku/winmusic:latest
-    container_name: web
+    container_name: winmusic-app
+    restart: always
     ports:
       - "80:80"
-    restart: always
+    environment:
+      - DB_SERVER=winmusic-db.xxxxxxxxxx.ap-southeast-2.rds.amazonaws.com
+      - DB_PORT=3306
+      - DB_USER=admin
+      - DB_PASS=WinMusic1234!
+      - DB_NAME=stockdb
+      - JWT_SECRET=my_super_secret_key_123456
+      - JWT_EXPIRES=7d
