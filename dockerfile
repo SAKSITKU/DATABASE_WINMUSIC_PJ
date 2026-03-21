@@ -14,17 +14,18 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --production
 COPY *.js ./
-COPY uploads ./uploads
+
+# สร้าง uploads folder
+RUN mkdir -p uploads/images
 
 # Copy built frontend
 COPY --from=build /app/dist ./public
 
-# Install serve สำหรับ static files
+# Install serve
 RUN npm install -g serve
 
 EXPOSE 80 3040
 
-# Start script
 COPY start.sh ./
 RUN chmod +x start.sh
 CMD ["./start.sh"]
