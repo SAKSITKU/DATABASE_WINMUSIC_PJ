@@ -1,13 +1,20 @@
 version: '3.8'
 
 services:
-  app:
-    image: YOUR_DOCKER_USERNAME/YOUR_REPO_NAME:latest
-    container_name: winmusic-app
+  frontend:
+    image: saksitku/winmusic:latest
+    container_name: winmusic-frontend
     restart: always
     ports:
       - "80:80"
+
+  backend:
+    image: saksitku/winmusic:latest
+    container_name: winmusic-backend
+    restart: always
+    ports:
       - "3040:3040"
+    command: node server.js
     environment:
       - DB_SERVER=winmusic-mysql.cpcw0oo2mac7.ap-southeast-2.rds.amazonaws.com
       - DB_PORT=3306
@@ -16,4 +23,4 @@ services:
       - DB_NAME=stockdb
       - JWT_SECRET=my_super_secret_key_123456
       - JWT_EXPIRES=7d
-      - VITE_API_BASE=http://13.239.219.107:3040
+      - PORT=3040
