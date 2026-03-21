@@ -1,17 +1,30 @@
-# Stage 1: Build (Vite)
+# Stage 1: Build React
 FROM node:18-alpine AS build
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm install
-
 COPY . .
 RUN npm run build
 
-# Stage 2: Serve ด้วย Nginx
-FROM nginx:alpine
+# Stage 2: Run Backend + Serve Frontend
+FROM node:18-alpine
+WORKDIR /app
 
-COPY --from=build /app/dist /usr/share/nginx/html
+# Copy backend files
+COPY package*.json ./
+RUN npm install --production
+COPY *.js ./
+COPY uploads ./uploads
 
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# Copy built frontend
+COPY --from=build /app/dist ./public
+
+# Install serve สำหรับ static files
+RUN npm install -g serve
+
+EXPOSE 80 3040
+
+# Start script
+COPY start.sh ./
+RUN chmod +x start.sh
+CMD ["./start.sh"]
